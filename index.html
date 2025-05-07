@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tree Voice Chat</title>
+  </head>
+  <body>
+    <div class="container">
+      <div class="tree">
+        <div class="trunk"></div>
+        <div class="leaves"></div>
+      </div>
+      <div class="ground"></div>
+
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="controls">
+          <button id="startButton">Start Voice Chat</button>
+          <button id="stopButton" disabled>Stop</button>
+        </div>
+        <div class="status" id="status">Click 'Start Voice Chat' to begin</div>
+      </div>
+    </div>
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>

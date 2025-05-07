@@ -1,0 +1,30 @@
+{
+  "name": "voiceai",
+  "version": "1.0.0",
+  "description": "A voice-enabled tree chatbot",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anish-dharam/voiceai.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/anish-dharam/voiceai/issues"
+  },
+  "homepage": "https://github.com/anish-dharam/voiceai#readme",
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4"
+  },
+  "dependencies": {
+    "openai": "^4.0.0"
+  }
+}
