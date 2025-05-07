@@ -1,12 +1,12 @@
 {
   "name": "voiceai",
   "version": "1.0.0",
-  "description": "A voice-enabled tree chatbot",
-  "type": "module",
+  "description": "Interactive tree chatbot with voice capabilities",
+  "main": "dist/app.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build": "webpack --mode production",
+    "dev": "webpack serve --mode development",
+    "start": "webpack serve --mode development"
   },
   "repository": {
     "type": "git",
@@ -19,12 +19,17 @@
     "url": "https://github.com/anish-dharam/voiceai/issues"
   },
   "homepage": "https://github.com/anish-dharam/voiceai#readme",
-  "devDependencies": {
-    "@types/node": "^20.11.24",
-    "typescript": "^5.3.3",
-    "vite": "^5.1.4"
-  },
   "dependencies": {
-    "openai": "^4.0.0"
+    "@vapi-ai/web": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "ts-loader": "^9.4.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0",
+    "webpack-dev-server": "^4.0.0",
+    "html-webpack-plugin": "^5.0.0",
+    "css-loader": "^6.0.0",
+    "style-loader": "^3.0.0"
   }
 }
