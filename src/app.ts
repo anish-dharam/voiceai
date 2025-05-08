@@ -18,6 +18,7 @@ class TreeChat {
   private currentAudio: HTMLAudioElement | null = null;
   private readonly SILENCE_THRESHOLD = -50; // dB
   private readonly SILENCE_DURATION = 1000; // ms
+  private isBotSpeaking: boolean = false;
 
   constructor() {
     this.whisper = new WhisperSTT(process.env.OPENAI_API_KEY as string); // OpenAI API key
@@ -86,14 +87,14 @@ class TreeChat {
 
     const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
     const checkLevel = () => {
-      if (!this.analyser || !this.isSessionActive) return;
+      if (!this.analyser) return;
 
       this.analyser.getByteFrequencyData(dataArray);
       const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
       const db = 20 * Math.log10(average / 255);
 
       if (db < this.SILENCE_THRESHOLD) {
-        if (!this.silenceTimer) {
+        if (!this.silenceTimer && this.isSessionActive) {
           this.silenceTimer = window.setTimeout(() => {
             if (this.isSessionActive) {
               this.handleStop();
@@ -105,12 +106,34 @@ class TreeChat {
           clearTimeout(this.silenceTimer);
           this.silenceTimer = null;
         }
+
+        // If bot is speaking and user starts talking, interrupt
+        if (this.isBotSpeaking && !this.isSessionActive) {
+          this.interruptBot();
+        }
       }
 
       requestAnimationFrame(checkLevel);
     };
 
     checkLevel();
+  }
+
+  private async interruptBot(): Promise<void> {
+    if (this.currentAudio) {
+      // Only pause if not already paused
+      if (!this.currentAudio.paused) {
+        try {
+          this.currentAudio.pause();
+        } catch (e) {
+          // Ignore play/pause race errors
+          console.warn("Audio pause error (likely safe to ignore):", e);
+        }
+      }
+      this.currentAudio = null;
+    }
+    this.isBotSpeaking = false;
+    await this.handleStart();
   }
 
   private async handleStart(): Promise<void> {
@@ -122,7 +145,9 @@ class TreeChat {
       this.endConversationButton.disabled = false;
       this.isSessionActive = true;
 
-      await this.setupAudioAnalysis();
+      if (!this.audioContext) {
+        await this.setupAudioAnalysis();
+      }
       await this.whisper.startRecording();
       console.log("handleStart: Recording started");
     } catch (error) {
@@ -142,15 +167,10 @@ class TreeChat {
       this.endConversationButton.disabled = false;
       this.isSessionActive = false;
 
-      // Clean up audio analysis
+      // Don't clean up audio analysis anymore
       if (this.silenceTimer) {
         clearTimeout(this.silenceTimer);
         this.silenceTimer = null;
-      }
-      if (this.audioContext) {
-        await this.audioContext.close();
-        this.audioContext = null;
-        this.analyser = null;
       }
 
       await this.whisper.stopRecording(async (text: string) => {
@@ -209,16 +229,21 @@ class TreeChat {
             const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
+            this.currentAudio = audio;
+            this.isBotSpeaking = true;
 
             // event listener for when audio finishes playing
             audio.addEventListener("ended", () => {
-              // clean up  URL
+              // clean up URL
               URL.revokeObjectURL(audioUrl);
+              this.isBotSpeaking = false;
               // start the next recording session
               this.handleStart();
             });
 
-            audio.play();
+            audio.play().catch((e) => {
+              console.warn("Audio play error (likely safe to ignore):", e);
+            });
           } catch (ttsError) {
             console.error("Error with ElevenLabs TTS:", ttsError);
           }
@@ -260,6 +285,7 @@ class TreeChat {
       this.status.textContent =
         "Conversation ended. Click 'Start Voice Chat' to begin a new conversation.";
       this.isSessionActive = false;
+      this.isBotSpeaking = false;
     } catch (error) {
       console.error("Error ending conversation:", error);
       this.status.textContent = "Error occurred while ending conversation.";
@@ -305,14 +331,18 @@ class TreeChat {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       this.currentAudio = audio;
+      this.isBotSpeaking = true;
 
       audio.addEventListener("ended", () => {
         URL.revokeObjectURL(audioUrl);
         this.currentAudio = null;
+        this.isBotSpeaking = false;
         this.handleStart();
       });
 
-      audio.play();
+      audio.play().catch((e) => {
+        console.warn("Audio play error (likely safe to ignore):", e);
+      });
     } catch (error) {
       console.error("Error with tree TTS:", error);
     }
