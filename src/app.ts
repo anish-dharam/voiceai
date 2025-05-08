@@ -1,8 +1,8 @@
-import Vapi from "@vapi-ai/web";
+import { WhisperSTT } from "whisper-speech-to-text";
 import "./styles.css";
 
 class TreeChat {
-  private vapi: Vapi;
+  private whisper: WhisperSTT;
   private chatMessages: HTMLElement;
   private startButton: HTMLButtonElement;
   private stopButton: HTMLButtonElement;
@@ -11,8 +11,7 @@ class TreeChat {
   private isSessionActive: boolean = false;
 
   constructor() {
-    this.vapi = new Vapi("134d3911-f09a-45d6-8773-bddcc3943811"); // vapi public key
-
+    this.whisper = new WhisperSTT(process.env.OPENAI_API_KEY as string); // OpenAI API key
     this.chatMessages = document.getElementById("chatMessages") as HTMLElement;
     this.startButton = document.getElementById(
       "startButton"
@@ -22,60 +21,20 @@ class TreeChat {
     ) as HTMLButtonElement;
     this.status = document.getElementById("status") as HTMLElement;
     this.tree = document.querySelector(".tree") as HTMLElement;
-
-    this.initializeVapi();
     this.initializeEventListeners();
   }
 
-  private initializeVapi(): void {
-    this.vapi.on("call-start", () => {
-      this.isSessionActive = true;
-    });
-
-    this.vapi.on("call-end", () => {
-      this.isSessionActive = false;
-    });
-
-    this.vapi.on("message", (message: any) => {
-      console.log(JSON.stringify(message, null, 2));
-      if (message.type === "transcript" && message.transcriptType === "final") {
-        this.addMessage(message.transcript, message.role === "user");
-      }
-    });
-
-    this.vapi.on("error", (error: Error) => {
-      console.error("Vapi error:", error);
-      this.status.textContent = "Error occurred. Please try again.";
-    });
-  }
-
   private initializeEventListeners(): void {
-    this.startButton.addEventListener("click", this.handleStart.bind(this));
-    this.stopButton.addEventListener("click", this.handleStop.bind(this));
+    this.startButton.addEventListener("click", () => {
+      console.log("Start button clicked");
+      this.handleStart();
+    });
+    this.stopButton.addEventListener("click", () => {
+      console.log("Stop button clicked");
+      this.handleStop();
+    });
     this.tree.addEventListener("click", this.handleTreeClick.bind(this));
   }
-
-  // private addMessage(text: string, isUser: boolean = false): void {
-  //   const lastMessage = this.chatMessages.lastElementChild;
-  //   console.log("lastMessage", lastMessage?.textContent);
-  //   if (!lastMessage || !text.startsWith(lastMessage?.textContent ?? "")) {
-  //     //check this
-  //     console.log("not replacing");
-  //     const messageDiv = document.createElement("div");
-  //     messageDiv.className = `message ${
-  //       isUser ? "user-message" : "bot-message"
-  //     }`;
-  //     messageDiv.textContent = text;
-  //     this.chatMessages.appendChild(messageDiv);
-  //     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
-  //   } else {
-  //     console.log("else, replacing");
-  //     lastMessage.textContent = text;
-  //     lastMessage.className = `message ${
-  //       isUser ? "user-message" : "bot-message"
-  //     }`;
-  //   }
-  // }
 
   private addMessage(text: string, isUser: boolean = false): void {
     const messageDiv = document.createElement("div");
@@ -87,15 +46,14 @@ class TreeChat {
 
   private async handleStart(): Promise<void> {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
-
-      await this.vapi.start("cc2c5f63-c47d-4cd3-8c74-8c5a6d03bcd3");
+      console.log("handleStart: Attempting to start recording");
+      this.status.textContent = "Listening...";
       this.startButton.disabled = true;
       this.stopButton.disabled = false;
-      this.status.textContent = "Listening...";
+      await this.whisper.startRecording();
+      console.log("handleStart: Recording started");
     } catch (error) {
-      console.error("Error starting Vapi:", error);
+      console.error("Error starting Whisper recording:", error);
       this.status.textContent =
         "Failed to start voice chat. Please ensure microphone permissions are granted.";
     }
@@ -103,12 +61,19 @@ class TreeChat {
 
   private async handleStop(): Promise<void> {
     try {
-      await this.vapi.stop();
+      console.log("handleStop: Attempting to stop recording");
+      this.status.textContent = "Transcribing...";
       this.startButton.disabled = false;
       this.stopButton.disabled = true;
-      this.status.textContent = "Voice chat stopped";
+      await this.whisper.stopRecording((text: string) => {
+        console.log("handleStop: Transcription received", text);
+        this.addMessage(text, true);
+        this.status.textContent = "Ready";
+      });
+      console.log("handleStop: Recording stopped");
     } catch (error) {
-      console.error("Error stopping Vapi:", error);
+      console.error("Error stopping Whisper recording:", error);
+      this.status.textContent = "Error occurred during transcription.";
     }
   }
 
