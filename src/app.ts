@@ -169,7 +169,10 @@ class TreeChat {
               body: JSON.stringify({
                 model: "gpt-4.1-nano",
                 messages: [
-                  { role: "system", content: "You are a helpful assistant." },
+                  {
+                    role: "system",
+                    content: "You are a helpful, sassy assistant.",
+                  },
                   { role: "user", content: text },
                 ],
                 temperature: 0.7,
