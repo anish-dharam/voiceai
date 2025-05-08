@@ -22,6 +22,7 @@
   "dependencies": {
     "@vapi-ai/web": "^1.0.0",
     "dotenv": "^16.5.0",
+    "elevenlabs": "^1.58.0",
     "whisper-speech-to-text": "^1.0.3"
   },
   "devDependencies": {
