@@ -37,7 +37,8 @@ class TreeChat {
     });
 
     this.vapi.on("message", (message: any) => {
-      if (message.type === "transcript") {
+      console.log(JSON.stringify(message, null, 2));
+      if (message.type === "transcript" && message.transcriptType === "final") {
         this.addMessage(message.transcript, message.role === "user");
       }
     });
@@ -53,6 +54,28 @@ class TreeChat {
     this.stopButton.addEventListener("click", this.handleStop.bind(this));
     this.tree.addEventListener("click", this.handleTreeClick.bind(this));
   }
+
+  // private addMessage(text: string, isUser: boolean = false): void {
+  //   const lastMessage = this.chatMessages.lastElementChild;
+  //   console.log("lastMessage", lastMessage?.textContent);
+  //   if (!lastMessage || !text.startsWith(lastMessage?.textContent ?? "")) {
+  //     //check this
+  //     console.log("not replacing");
+  //     const messageDiv = document.createElement("div");
+  //     messageDiv.className = `message ${
+  //       isUser ? "user-message" : "bot-message"
+  //     }`;
+  //     messageDiv.textContent = text;
+  //     this.chatMessages.appendChild(messageDiv);
+  //     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+  //   } else {
+  //     console.log("else, replacing");
+  //     lastMessage.textContent = text;
+  //     lastMessage.className = `message ${
+  //       isUser ? "user-message" : "bot-message"
+  //     }`;
+  //   }
+  // }
 
   private addMessage(text: string, isUser: boolean = false): void {
     const messageDiv = document.createElement("div");
