@@ -9,10 +9,9 @@ class TreeChat {
   private status: HTMLElement;
   private tree: HTMLElement;
   private isSessionActive: boolean = false;
-  private readonly assistantId: string = "YOUR_ASSISTANT_ID"; // Replace with your actual assistant ID
 
   constructor() {
-    this.vapi = new Vapi("YOUR_VAPI_PUBLIC_KEY"); // Replace with your Vapi public key
+    this.vapi = new Vapi("134d3911-f09a-45d6-8773-bddcc3943811"); // vapi public key
 
     this.chatMessages = document.getElementById("chatMessages") as HTMLElement;
     this.startButton = document.getElementById(
@@ -65,13 +64,17 @@ class TreeChat {
 
   private async handleStart(): Promise<void> {
     try {
-      await this.vapi.start(this.assistantId);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+
+      await this.vapi.start("cc2c5f63-c47d-4cd3-8c74-8c5a6d03bcd3");
       this.startButton.disabled = true;
       this.stopButton.disabled = false;
       this.status.textContent = "Listening...";
     } catch (error) {
       console.error("Error starting Vapi:", error);
-      this.status.textContent = "Failed to start voice chat";
+      this.status.textContent =
+        "Failed to start voice chat. Please ensure microphone permissions are granted.";
     }
   }
 
