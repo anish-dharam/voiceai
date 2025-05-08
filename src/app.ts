@@ -11,6 +11,11 @@ class TreeChat {
   private tree: HTMLElement;
   private isSessionActive: boolean = false;
   private elevenLabs: any;
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private silenceTimer: number | null = null;
+  private readonly SILENCE_THRESHOLD = -50; // dB
+  private readonly SILENCE_DURATION = 1000; // ms
 
   constructor() {
     this.whisper = new WhisperSTT(process.env.OPENAI_API_KEY as string); // OpenAI API key
@@ -49,18 +54,72 @@ class TreeChat {
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
   }
 
+  // setup audio
+  private async setupAudioAnalysis(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.audioContext = new AudioContext();
+      const source = this.audioContext.createMediaStreamSource(stream);
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 2048;
+      source.connect(this.analyser);
+
+      // Start monitoring audio levels
+      this.monitorAudioLevel();
+    } catch (error) {
+      console.error("Error setting up audio analysis:", error);
+      throw error;
+    }
+  }
+
+  private monitorAudioLevel(): void {
+    if (!this.analyser) return;
+
+    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    const checkLevel = () => {
+      if (!this.analyser || !this.isSessionActive) return;
+
+      this.analyser.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      const db = 20 * Math.log10(average / 255);
+
+      if (db < this.SILENCE_THRESHOLD) {
+        if (!this.silenceTimer) {
+          this.silenceTimer = window.setTimeout(() => {
+            if (this.isSessionActive) {
+              this.handleStop();
+            }
+          }, this.SILENCE_DURATION);
+        }
+      } else {
+        if (this.silenceTimer) {
+          clearTimeout(this.silenceTimer);
+          this.silenceTimer = null;
+        }
+      }
+
+      requestAnimationFrame(checkLevel);
+    };
+
+    checkLevel();
+  }
+
   private async handleStart(): Promise<void> {
     try {
       console.log("handleStart: Attempting to start recording");
       this.status.textContent = "Listening...";
       this.startButton.disabled = true;
       this.stopButton.disabled = false;
+      this.isSessionActive = true;
+
+      await this.setupAudioAnalysis();
       await this.whisper.startRecording();
       console.log("handleStart: Recording started");
     } catch (error) {
       console.error("Error starting Whisper recording:", error);
       this.status.textContent =
         "Failed to start voice chat. Please ensure microphone permissions are granted.";
+      this.isSessionActive = false;
     }
   }
 
@@ -70,6 +129,19 @@ class TreeChat {
       this.status.textContent = "Transcribing...";
       this.startButton.disabled = false;
       this.stopButton.disabled = true;
+      this.isSessionActive = false;
+
+      // Clean up audio analysis
+      if (this.silenceTimer) {
+        clearTimeout(this.silenceTimer);
+        this.silenceTimer = null;
+      }
+      if (this.audioContext) {
+        await this.audioContext.close();
+        this.audioContext = null;
+        this.analyser = null;
+      }
+
       await this.whisper.stopRecording(async (text: string) => {
         console.log("handleStop: Transcription received", text);
         this.addMessage(text, true);
@@ -123,6 +195,15 @@ class TreeChat {
             const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
+
+            // event listener for when audio finishes playing
+            audio.addEventListener("ended", () => {
+              // clean up  URL
+              URL.revokeObjectURL(audioUrl);
+              // start the next recording session
+              this.handleStart();
+            });
+
             audio.play();
           } catch (ttsError) {
             console.error("Error with ElevenLabs TTS:", ttsError);
