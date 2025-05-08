@@ -7,6 +7,7 @@ class TreeChat {
   private chatMessages: HTMLElement;
   private startButton: HTMLButtonElement;
   private stopButton: HTMLButtonElement;
+  private endConversationButton: HTMLButtonElement;
   private status: HTMLElement;
   private tree: HTMLElement;
   private isSessionActive: boolean = false;
@@ -14,6 +15,7 @@ class TreeChat {
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private silenceTimer: number | null = null;
+  private currentAudio: HTMLAudioElement | null = null;
   private readonly SILENCE_THRESHOLD = -50; // dB
   private readonly SILENCE_DURATION = 1000; // ms
 
@@ -29,6 +31,9 @@ class TreeChat {
     this.stopButton = document.getElementById(
       "stopButton"
     ) as HTMLButtonElement;
+    this.endConversationButton = document.getElementById(
+      "endConversationButton"
+    ) as HTMLButtonElement;
     this.status = document.getElementById("status") as HTMLElement;
     this.tree = document.querySelector(".tree") as HTMLElement;
     this.initializeEventListeners();
@@ -42,6 +47,10 @@ class TreeChat {
     this.stopButton.addEventListener("click", () => {
       console.log("Stop button clicked");
       this.handleStop();
+    });
+    this.endConversationButton.addEventListener("click", () => {
+      console.log("End conversation button clicked");
+      this.handleEndConversation();
     });
     this.tree.addEventListener("click", this.handleTreeClick.bind(this));
   }
@@ -110,6 +119,7 @@ class TreeChat {
       this.status.textContent = "Listening...";
       this.startButton.disabled = true;
       this.stopButton.disabled = false;
+      this.endConversationButton.disabled = false;
       this.isSessionActive = true;
 
       await this.setupAudioAnalysis();
@@ -127,8 +137,9 @@ class TreeChat {
     try {
       console.log("handleStop: Attempting to stop recording");
       this.status.textContent = "Transcribing...";
-      this.startButton.disabled = false;
+      this.startButton.disabled = true;
       this.stopButton.disabled = true;
+      this.endConversationButton.disabled = false;
       this.isSessionActive = false;
 
       // Clean up audio analysis
@@ -221,11 +232,87 @@ class TreeChat {
     }
   }
 
-  private handleTreeClick(): void {
+  private async handleEndConversation(): Promise<void> {
+    try {
+      // stop any ongoing recording
+      if (this.isSessionActive) {
+        await this.handleStop();
+      }
+
+      // clean up audio analysis
+      if (this.silenceTimer) {
+        clearTimeout(this.silenceTimer);
+        this.silenceTimer = null;
+      }
+      if (this.audioContext) {
+        await this.audioContext.close();
+        this.audioContext = null;
+        this.analyser = null;
+      }
+
+      // reset UI state
+      this.startButton.disabled = false;
+      this.stopButton.disabled = true;
+      this.endConversationButton.disabled = true;
+      this.status.textContent =
+        "Conversation ended. Click 'Start Voice Chat' to begin a new conversation.";
+      this.isSessionActive = false;
+    } catch (error) {
+      console.error("Error ending conversation:", error);
+      this.status.textContent = "Error occurred while ending conversation.";
+    }
+  }
+
+  private async handleTreeClick(): Promise<void> {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
+
+    if (this.isSessionActive) {
+      await this.handleStop();
+    }
+
     this.addMessage(
       "🌳 *rustling leaves* Hello! How can I help you today?",
       false
     );
+
+    try {
+      const voiceId = "21m00Tcm4TlvDq8ikWAM";
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "xi-api-key": process.env.ELEVENLABS_API_KEY as string,
+          },
+          body: JSON.stringify({
+            text: "Hello! How can I help you today?",
+            model_id: "eleven_monolingual_v1",
+            voice_settings: { stability: 0.5, similarity_boost: 0.5 },
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error("TTS API error");
+      const audioData = await response.arrayBuffer();
+      const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      this.currentAudio = audio;
+
+      audio.addEventListener("ended", () => {
+        URL.revokeObjectURL(audioUrl);
+        this.currentAudio = null;
+        this.handleStart();
+      });
+
+      audio.play();
+    } catch (error) {
+      console.error("Error with tree TTS:", error);
+    }
   }
 }
 
