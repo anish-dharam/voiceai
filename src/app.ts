@@ -107,7 +107,7 @@ class TreeChat {
           this.silenceTimer = null;
         }
 
-        // If bot is speaking and user starts talking, interrupt
+        // bot is speaking and user starts talking, interrupt
         if (this.isBotSpeaking && !this.isSessionActive) {
           this.interruptBot();
         }
